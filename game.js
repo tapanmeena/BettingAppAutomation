@@ -7,7 +7,7 @@ const password = process.env.password;
 
 // Global variables
 let orderInterval = 180000; // 3 minutes
-let token = "";
+let token = "XXXX";
 let game_id = 426482;
 let contract_type = 1;
 let type = 1;
