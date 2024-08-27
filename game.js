@@ -7,12 +7,16 @@ const password = process.env.password;
 
 // Global variables
 let orderInterval = 180000; // 3 minutes
-let token = "XXXX";
+let token = "";
 let game_id = 426482;
 let contract_type = 1;
+let contract_number = 1;
 let type = 1;
 let pick = "green";
+let previousPick = "green";
 let previousBalance = 0;
+let firstGame = true;
+let balanceThreshold = 800;
 
 let headers = {
   accept: "application/json, text/plain, */*",
@@ -67,7 +71,7 @@ const getBalance = async () => {
  * Adds an order.
  * @returns {Promise<void>}
  */
-const addOrder = async (contract_number) => {
+const addOrder = async () => {
   const addOrderResponse = await request(
     "https://art.redpearlmall.com/api/project/add_order",
     "POST",
@@ -105,6 +109,26 @@ const getGameHistory = async () => {
 };
 
 /**
+ * Converts the text to color emoji.
+ * @param {string} text - The text to convert.
+ * @returns {string} - The color emoji.
+ */
+const convertTextToColor = (text) => {
+  let textArr = text.split(",");
+  let colorArr = [];
+  textArr.forEach((element) => {
+    if (element === "green") {
+      colorArr.push("🟢");
+    } else if (element === "red") {
+      colorArr.push("🔴");
+    } else if (element === "violet") {
+      colorArr.push("🟣");
+    }
+  });
+  return colorArr.join("");
+}
+
+/** 
  * Main function to execute the workflow.
  * @returns {Promise<void>}
  */
@@ -126,13 +150,25 @@ const main = async () => {
   console.log("Current Balance: ", currentBalance);
   previousBalance = currentBalance;
 
+  // Check if the balance is less than the threshold
+  if (currentBalance <= balanceThreshold) {
+    console.log("Balance is below the threshold. Exiting the game with current balance:", currentBalance);
+    process.exit(0); // Exit the process
+  }
+
   const gameHistoryResponse = await getGameHistory();
   const prevGame = gameHistoryResponse.data.list[0];
   game_id = prevGame.id + 1;
   const prevColor = prevGame.color;
 
-  // Uncomment the following line for alternate color
-  // pick = prevColor === "green" ? "red" : "green";
+  // print last 10 gamehistory response 
+  let gameHistory = gameHistoryResponse.data.list;
+  console.log("Last 10 Game History");
+  let gameArr = [];
+  gameHistory.forEach((game) => {
+    gameArr.push(convertTextToColor(game.color));
+  });
+  console.log(gameArr.join(","));
 
   // Use the same color
   pick = prevColor.split(",")[0];
@@ -140,12 +176,28 @@ const main = async () => {
   console.log("Previous Color: ", prevColor);
   console.log("Current Pick: ", pick);
 
-  await addOrder(1);
+  if (!firstGame) {
+    let winColor = prevColor.split(",")[0];
+    console.log(winColor === previousPick ? "WON" : "LOST");
+
+    if (winColor !== previousPick && contract_number < 9) {
+      contract_number *= 3;
+    }
+    else {
+      contract_number = 1;
+    }
+  }
+
+  await addOrder(contract_number);
+
+  // updates the pick for the next game
+  previousPick = pick;
 
   // Next order at HH:MM:SS AM/PM in UTC+5:30 timezone
   const nextDate = new Date();
   nextDate.setMinutes(nextDate.getMinutes() + 3);
   console.log("Next order at", nextDate.toLocaleTimeString("en-US", { timeZone: "Asia/Kolkata" }));
+  firstGame = false;
 };
 
 // Run the main function immediately
